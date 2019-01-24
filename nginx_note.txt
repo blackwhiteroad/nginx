@@ -1,0 +1,62 @@
+#nginx常用模块:
+1.--with-http_ssl_module		//开启SSL加密功能
+2.--with-http_stub_status_module	//开启nginx监控模块
+3.--with-stream				//开启4层反向代理功能
+注释:开始安装nginx时，一并安装nginx的常用模块，以免后续加模块，导致服务异常
+
+#nginx升级安装与加载新模块的执行操作
+1.nginx升级安装
+#已安装nginx-1.10.3版本，升级到nginx-1.12.2
+]#tar -xf nginx-1.12.2.tar.gz
+]#cd nginx-1.12.2/
+]#./configure --group=nginx --user=nginx --with-http_ssl_module --with-http_stub_status_module	//升级安装与源安装一致操作模块，也可新增加模块
+]#make	//重新编译，切忌不可安装:make install
+]#mv /usr/local/nginx/sbin/nginx{,.bak}	//源版本进行备份，以便随时可以回退版本
+]#killall nginx	//杀死nginx的相关进程
+]#cp objs/nginx /usr/local/nginx/sbin/	//复制新版本到执行目录下
+]#nginx		//启动nginx，已制作软链接
+]#nginx -V	//查看版本及安装的插件信息
+2.版本nginx-1.12.2的基础上加载新的模块
+]# nginx -V
+nginx version: nginx/1.12.2
+built by gcc 4.8.5 20150623 (Red Hat 4.8.5-16) (GCC) 
+built with OpenSSL 1.0.2k-fips  26 Jan 2017
+TLS SNI support enabled
+configure arguments: --group=nginx --user=nginx --with-http_ssl_module --with-http_stub_status_module
+]#cd nginx-1.12.2/
+]#./configure --group=nginx --user=nginx --with-http_ssl_module --with-http_stub_status_module     //还没有监控模块:stream
+]#make  //重新编译，切忌不可安装:make install
+]#mv /usr/local/nginx/sbin/nginx{,.bak} //源版本进行备份，以便随时可以回退版
+本
+]#killall nginx //杀死nginx的相关进程
+]#cp objs/nginx /usr/local/nginx/sbin/  //复制新版本到执行目录下
+]#nginx         //启动nginx，已制作软链接
+]#nginx -V      //查看版本及安装的插件信息
+nginx version: nginx/1.12.2
+built by gcc 4.8.5 20150623 (Red Hat 4.8.5-16) (GCC) 
+built with OpenSSL 1.0.2k-fips  26 Jan 2017
+TLS SNI support enabled
+configure arguments: --group=nginx --user=nginx --with-http_ssl_module --with-http_stub_status_module --with-stream	//已增加监控模块:stream
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
