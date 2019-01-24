@@ -187,6 +187,172 @@ stream {
 ]# nginx -s reload
 ]# ssh -p 12345 192.168.5.7	//客户端测试远程连接，可直接进入到web服务器
 
+**查看nginx调度器状态页面
+]# vim /usr/local/nginx/conf/nginx.conf
+... ...
+    server {
+        listen       80;
+        server_name  localhost;
+        location /status {
+            stub_status on;
+	    #allow IP地址;	//生产环境一般写本机地址
+	    #deny IP地址;	//生产环境一般写禁止地址
+        }
+	... ...
+}
+... ...
+]# nginx -s reload
+]# curl http://192.168.5.7/status
+Active connections: 1 
+server accepts handled requests
+ 3851 3851 1107 
+Reading: 0 Writing: 1 Waiting: 0
+参数详解:
+Active connections:当前活动的连接数量
+accepts:已经接受客户端的连接总数量
+handled:已经处理客户端的连接总数量(一般与accepts一致,除非服务器限制了连接数量)
+requests:客户端发送的请求数量
+Reading:当前服务器正在读取客户端请求头的数量
+Writing:当前服务器正在写响应信息的数量
+Waiting:当前多少客户端在等待服务器的响应
+
+**优化nginx并发量
+注释:nginx的理论并发量5w,实际生产环境中，动态至多达到几千的并发量，静态可达到万把的并发量
+*优化前配置
+]# yum -y install httpd-tools //安装测试包
+]# ab -c 2000 -n 2000 http://192.168.5.7/
+... ...
+socket: Too many open files (24)	//提示打开文件数量过多
+*修改Nginx配置文件，增加并发量
+]# vim /usr/local/nginx/conf/nginx.conf
+... ...
+worker_processes  2;		//与CPU核心数量一致
+events {
+    worker_connections  65535;	//每个worker最大并发连接数
+    use epoll;	//epoll是Linux内核为处理大批量文件描述符而作了改进的poll，是Linux下多路复用IO接口select/poll的增强版本，它能显著提高程序在大量并发连接中只有少量活跃的情况下的系统CPU利用率。
+}
+]# nginx -s reload
+*优化linux内核参数(最大文件数量)
+]# ulimit -a		//查看所有属性值
+]# ulimit -Hn 100000	//设置硬限制(临时规则)
+]# ulimit -Sn 100000	//设置软限制(临时规则)
+#永久设置有效
+]# vim /etc/security/limits.conf
+#<domain>      <type>  <item>         <value>
+*               soft    nofile          100000
+*               hard    nofile          100000
+参数分4列详解如下:
+#用户或组	硬限制或软限制	需要限制的项目	限制的值
+]# ab -c 11000 -n 11000 http://192.168.5.7/
+... ...
+100%   4027 (longest request)
+
+*优化nginx数据包头缓存
+#优化前，使用脚本测试长头部请求是否能获得响应
+]# vim buffer.sh
+#!/bin/bash
+URL=http://192.168.5.7/index.html?
+for i in {1..5000}
+do
+	URL=${URL}v$i=$i
+done
+curl $URL
+#客户端测试
+~]# sh buffer.sh
+... ...
+<head><title>414 Request-URI Too Large</title></head>
+... ...
+#修改nginx配置文件，增加数据包头部缓存大小
+]# vim /usr/local/nginx/conf/nginx.conf
+http {
+... ...
+    client_header_buffer_size   1k;	//默认请求包头信息的缓存
+    large_client_header_buffers 4 4m;	//大请求包头信息的缓存个数与容量
+... ...
+}
+#客户端测试
+~]# sh buffer.sh
+... ...
+<h1>Welcome to nginx!</h1>
+... ...
+
+*修改nginx配置文件，定义对静态页面的缓存时间
+]# vim /usr/local/nginx/conf/nginx.conf
+http {
+... ...
+        location ~* \.(jpg|jpeg|gif|png|css|js|ico|xml)$ {
+            expires     30d;	//定义客户端缓存时间为30天
+        }
+... ...
+}
+]# nginx -s reload
+#客户端测试
+]# firefox http://192.168.5.7/day.jpg
+
+*自动完成日志切割功能	//重点
+每周5的03点03分自动执行脚本完成日志切割工作
+]# vim /usr/local/nginx/logbak.sh
+#!/bin/bash
+date=`date +%Y%m%d`
+logpath=/usr/local/nginx/logs
+mv $logpath/access.log $logpath/access-$date.log
+mv $logpath/error.log $logpath/error-$date.log
+kill -USR1 $(cat $logpath/nginx.pid)
+]# chmod +x /usr/local/nginx/logbak.sh	//务必要授予执行权限，否则其它用户米有此权限，导致自动定时不了任务
+]# crontab -e
+03 03 * * 5 /usr/local/nginx/logbak.sh
+
+*对页面进行压缩处理
+#修改nginx配置文件
+]# vim /usr/local/nginx/conf/nginx.conf
+http {
+... ...
+    gzip  on;			//开启压缩功能
+    gzip_min_length 1000;	//小文件不压缩
+    gzip_comp_level 4;		//压缩比率，4为最佳
+    gzip_types text/plain text/css application/json application/x-javascript t
+ext/xml application/xml application/xml+rss text/javascript;	//对特定文件压缩，类型参考/usr/local/nginx/conf/mime.types
+... ...
+}
+]# nginx -s reload
+
+*服务器内存缓存
+]# vim /usr/local/nginx/conf/nginx.conf
+http {
+... ...
+    #设置服务器最大缓存2000个文件句柄，关闭20秒内无请求的文件句柄
+    open_file_cache     max=2000        inactive=20s;
+    #文件句柄的有效时间是60s，60s后过期
+    open_file_cache_valid       60s;
+    #只有访问次数超过5次会被缓存
+    open_file_cache_min_uses    5;
+    open_file_cache_errors      off;
+... ... 
+}
+]# nginx -s reload
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
