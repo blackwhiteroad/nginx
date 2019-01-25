@@ -331,30 +331,24 @@ http {
 }
 ]# nginx -s reload
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+**session,cookie(sessionID)
+client---------->server[验证身份]
+		[user,pass]
+		生成session文件[文件名，内容]
+		uuid:tom,已登陆
+     <----------
+     网页内容，包头cookie:uuid
+第二次访问:
+      ---------->
+浏览器(cookie)	cookie:uuid,找对应的文件
+		打开文件内容:tom,已登陆
+*服务器端session的实现共享，客户端通过cookie访问到服务器的资源
+实现方法有两种：
+1.
+		web1(lnmp)	mount ip:/common /var/lib/session
+client	proxy								nfs:/commom(需要另起1台服务器)
+		web2(lnmp)	mount ip:/common /var/lib/session
+2.
+				web1(lnmp)
+client	proxy+memcached(非关系型数据库库memcached用于存储服务器的session信息)
+				web2(lnmp)
