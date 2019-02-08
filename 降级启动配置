@@ -1,0 +1,12 @@
+前言:各个服务应用应与对应的账户进行登陆,避免使用root账户,提高安全性,eg:mysql账户<--->mysql数据库服务,tomcat账户<--->tomcat,
+*降级启动,以tomcat为例
+useradd tomcat
+//修改tomcat目录的权限,让tomcat账户对该目录有操作权限
+chown -R tomcat:tomcat /usr/local/tomcat/
+//使用su命令切换为tomcat账户,以tomcat账户的身份启动tomcat服务
+su - tomcat -c /usr/local/tomcat/bin/startup.sh
+//执行开机启动文件
+chmod +x /etc/rc.local 
+//修改文件,添加如下内容
+]# vim /etc/rc.local 
+14 su -c tomcat /usr/local/tomcat/bin/startup.sh
